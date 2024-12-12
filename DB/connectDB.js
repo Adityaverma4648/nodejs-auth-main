@@ -1,15 +1,17 @@
 const mongoose = require('mongoose');
-mongoose.set('strictQuery', false);
 
-const connectDB = async (uri)=>{
-
+const connectDB = async () => {
+    const uri = process.env.MONGODB_URI; // Ensure this matches your environment variable name
+    if (!uri) {
+        throw new Error('MongoDB URI is not defined');
+    }
     try {
         await mongoose.connect(uri);
-        console.log('Connected With DB');
+        console.log('MongoDB connected successfully');
     } catch (error) {
-        console.log(error);
-        throw error;
+        console.error('MongoDB connection failed:', error.message);
+        process.exit(1);
     }
-}
+};
 
 module.exports = connectDB;
