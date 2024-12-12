@@ -1,6 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const User = require("../Model/User");
+const User = require("../Model/user");
 const generateToken = require("../Config/JWT");
 const authMiddleware = require("../Middleware/authMiddleware");
 const dotenv = require("dotenv");
