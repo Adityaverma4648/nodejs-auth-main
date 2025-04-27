@@ -1,26 +1,42 @@
+const GoogleUser = require("../model/GoogleUser");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "your-client-id";
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "your-client-secret";
-const User = require('../model/user');
+const dotenv = require("dotenv");
+dotenv.config();
 
 passport.use(
   new GoogleStrategy(
     {
-      clientID: GOOGLE_CLIENT_ID,
-      clientSecret: GOOGLE_CLIENT_SECRET,
-      callbackURL: "/auth/google/callback", // Ensure this matches your redirect URI in Google Console
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: `http://localhost:7000/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
-      try {
-        // Implement your user find or create logic here
-        const user = await User.findOrCreate({ googleId: profile.id });
-        done(null, user);
-      } catch (err) {
-        done(err, null);
+      // Check if user exists
+      const existingUser = await GoogleUser.findOne({ googleId: profile.id });
+
+      if (existingUser) {
+        return done(null, existingUser);
       }
+
+      // If new user, save to DB
+      const newUser = new GoogleUser({
+        googleId: profile.id,
+        name: profile.displayName,
+        email: profile.emails[0].value,
+        photo: profile.photos[0].value,
+      });
+
+      await newUser.save();
+      done(null, newUser);
     }
   )
 );
 
-module.exports = passport;
+passport.serializeUser((user, done) => {
+  done(null, user); // save entire user object to session (you can save user.id also)
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
