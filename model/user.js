@@ -19,7 +19,8 @@ const userSchema = new mongoose.Schema({
     profilePic : {
       url : String,
       public_id : String,
-    }
+    },
+
 },
 {
      timestamps: true,
