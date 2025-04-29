@@ -5,6 +5,8 @@ const dotenv = require("dotenv");
 const session = require("express-session");
 const connectDB = require("./DB/connectDB");
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/UserRoutes");
+
 
 dotenv.config();
 
@@ -26,6 +28,8 @@ app.use(passport.session());
 
 // Routes
 app.use("/auth", authRoutes);
+app.use("/user", userRoutes);
+
 
 app.get("/protected", (req, res) => {
   res.send("You are authorized to access this route!");
