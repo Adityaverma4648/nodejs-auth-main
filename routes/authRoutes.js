@@ -12,7 +12,7 @@ dotenv.config();
 const router = express.Router();
 
 router.post("/getUserDetails", authMiddleware, (req, res) => {
-  const { token } = req.body;
+  const { token } = req.headers.authorization;
   if (!token) return res.status(400).send("Token is null");
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
@@ -82,22 +82,11 @@ router.get(
   }),
   (req, res) => {
     const token = generateToken(req.user);
-    res.redirect("http://localhost:7000/auth/login/success");
+    res.redirect(`${REACTNATIVE_FRONTEND_URL}/login/success?token=${token}`);
   }
 );
 router.get("/login/failed", (req, res) => {
   res.status(401).json({ message: "Login Failed" });
-});
-
-router.get("/login/success", (req, res) => {
-  if (req.user) {
-    res.status(200).json({
-      message: "Login Successful",
-      user: req.user,
-    });
-  } else {
-    res.status(401).json({ message: "Not Authenticated" });
-  }
 });
 
 module.exports = router;
