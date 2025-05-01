@@ -6,10 +6,54 @@ const authMiddleware = require("../middleware/authMiddleware");
 const dotenv = require("dotenv");
 const passport = require("passport");
 require("../Config/passportConfig");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 dotenv.config();
 
 const router = express.Router();
+
+const sendOTPEmail = async (email, otp) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Your OTP Code",
+    text: `Your OTP for login is ${otp}. It will expire in 10 minutes.`,
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
+// Register route
+router.post("/register", async (req, res) => {
+  const { userName, email, password } = req.body;
+  if (!userName || !email || !password) {
+    return res.status(400).json({ message: "Fill all the entries!" });
+  }
+
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "User Email Already Exists!" });
+    }
+
+    const user = new User({ userName, email, password });
+    await user.save();
+    res
+      .status(201)
+      .json({ status: "success", message: "Successfully registered!" });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+});
 
 router.post("/getUserDetails", authMiddleware, (req, res) => {
   const { token } = req.headers.authorization;
@@ -20,11 +64,10 @@ router.post("/getUserDetails", authMiddleware, (req, res) => {
     res.status(200).json(user);
   });
 });
-
 router.post("/register", async (req, res) => {
   console.log(req.body);
-  const { userName, role, email, password } = req.body;
-  if (!userName || !email || !password || !role) {
+  const { userName, email, password } = req.body;
+  if (!userName || !email || !password ) {
     return res.status(400).json({ message: "Fill all the entries!" });
   }
   try {
@@ -42,20 +85,126 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// router.post("/login", async (req, res) => {
+//   const { email, password } = req.body;
+//   console.log(email, password);
+
+//   try {
+//     const user = await User.findOne({ email });
+//     if (user && (await user.matchPassword(password))) {
+//       const token = generateToken(user);
+//       res.status(200).json({ token });
+//     } else {
+//       res.status(400).json({ message: "Invalid email or password!" });
+//     }
+//   } catch (err) {
+//     res.status(500).json({ message: "Server Error", err });
+//   }
+// });
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  console.log(email, password);
+
+  try {
+    console.log({ email: email, password: password });
+    const user = await User.findOne({ email });
+
+    console.log(user);
+
+    if (user && (await user.matchPassword(password))) {
+      const otp = crypto.randomInt(100000, 999999).toString();
+      const otpExpiresAt = Date.now() + 10 * 60 * 1000;
+
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiresAt;
+      await user.save();
+
+      await sendOTPEmail(email, otp);
+
+      return res.status(200).json({
+        message: "OTP sent to your email! Please verify to continue.",
+        otpVerificationRequired: true,
+      });
+    } else {
+      return res.status(400).json({ message: "Invalid email or password!" });
+    }
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+});
+
+
+router.post("/requestOTP", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email is required!" });
 
   try {
     const user = await User.findOne({ email });
-    if (user && (await user.matchPassword(password))) {
-      const token = generateToken(user);
-      res.status(200).json({ token });
-    } else {
-      res.status(400).json({ message: "Invalid email or password!" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found!" });
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpExpiresAt = Date.now() + 10 * 60 * 1000;
+
+    user.otp = otp;
+    user.otpExpiresAt = otpExpiresAt;
+    await user.save();
+
+    await sendOTPEmail(email, otp);
+    res.status(200).json({ message: "OTP sent to your email!" });
   } catch (err) {
-    res.status(500).json({ message: "Server Error", err });
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+});
+
+router.post("/verifyOTP", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ message: "Email and OTP are required!" });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found!" });
+
+    if (user.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP!" });
+    }
+
+    if (user.otpExpiresAt < Date.now()) {
+      return res.status(400).json({ message: "OTP has expired!" });
+    }
+
+    const token = generateToken(user);
+    res.status(200).json({ message: "OTP verified successfully!", token });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+});
+
+router.post("/updatePassword", authMiddleware, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res
+      .status(400)
+      .json({ message: "Both current and new passwords are required!" });
+  }
+
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found!" });
+
+    if (!(await user.matchPassword(currentPassword))) {
+      return res.status(400).json({ message: "Incorrect current password!" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully!" });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
   }
 });
 
