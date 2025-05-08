@@ -20,7 +20,6 @@ const userSchema = new mongoose.Schema({
       url : String,
       public_id : String,
     },
-
 },
 {
      timestamps: true,
