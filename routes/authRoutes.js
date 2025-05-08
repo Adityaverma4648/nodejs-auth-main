@@ -37,19 +37,26 @@ router.post("/register", async (req, res) => {
 });
 
 router.post("/getUserDetails", authMiddleware, (req, res) => {
-  const { token } = req.headers.authorization;
-  if (!token) return res.status(400).send("Token is null");
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(400).send("Authorization header missing or malformed");
+  }
+
+  const token = authHeader.split(" ")[1];
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    console.log(user);
-    res.status(200).json(user);
+    if (err) {
+      return res.status(403).send("Invalid or expired token");
+    }
+
+    console.log("User decoded from token:", user);
+    return res.status(200).json(user);
   });
 });
 
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  console.log(email, password);
-
   try {
     const user = await User.findOne({ email });
     if (user && (await user.matchPassword(password))) {
@@ -93,7 +100,6 @@ router.post("/login", async (req, res) => {
 //     res.status(500).json({ message: "Server Error", error: err.message });
 //   }
 // });
-
 
 router.post("/updatePassword", authMiddleware, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
