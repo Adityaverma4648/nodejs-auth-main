@@ -6,6 +6,7 @@ const session = require("express-session");
 const connectDB = require("./DB/connectDB");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/UserRoutes");
+const path = require('path');
 
 
 dotenv.config();
