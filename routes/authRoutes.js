@@ -150,7 +150,7 @@ router.get(
   }),
   (req, res) => {
     const token = generateToken(req.user);
-    res.redirect(`${REACTNATIVE_FRONTEND_URL}/login/success?token=${token}`);
+    res.redirect(`${process.env.REACTNATIVE_FRONTEND_URL}/login/success?token=${token}`);
   }
 );
 router.get("/login/failed", (req, res) => {
